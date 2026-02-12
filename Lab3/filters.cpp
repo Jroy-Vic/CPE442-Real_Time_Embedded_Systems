@@ -122,11 +122,10 @@ cv::Mat to442_sobel(const cv::Mat &grayFrame) {
       // Calculate Edge Strength, |G|
       int G = abs(Gx) + abs(Gy);
       // Restrict to size 1 Unsigned Byte (0 - 255)
-      // Maximum: |Gx| + |Gy| = 2040
-      // G_byte = G * 255 / 2040 = G / 8 (Shift Right by 3 Bits)
-      G = G >> 3;
       if (G > 255) {
         G = 255;
+      } else if (G < 0) {
+        G = 0;
       }
 
 

@@ -45,9 +45,6 @@ int main(int argc, char** argv) {
   // Alert user to end program when desired
   std::cout << "Press 'q' or ESC to quit." << std::endl;
 
-  // Create display windows
-  cv::namedWindow("Original", cv::WINDOW_AUTOSIZE);
-  cv::namedWindow("Grayscale", cv::WINDOW_AUTOSIZE);
 
 // -------------------------------------------------- //
 
@@ -69,12 +66,12 @@ int main(int argc, char** argv) {
     }
 
     // Display Original Frame to user window
-    cv::imshow("Original", inFrame);
+   // cv::imshow("Original", inFrame);
 
     // Convert RGB Frame to Grayscale Frame
     outFrame = to442_grayscale(inFrame);
     // Display Frame to user window
-    cv::imshow("Grayscale", outFrame);
+   // cv::imshow("Grayscale", outFrame);
 
     // Convert Grayscale Frame to Sobel Frame
     outFrame = to442_sobel(outFrame);
@@ -82,7 +79,7 @@ int main(int argc, char** argv) {
     cv::imshow("Sobel", outFrame);
   
     // Wait for User to Close Window
-    int key = cv::waitKey(delay) & 0xFF;
+    int key = cv::waitKey(1) & 0xFF;
     if (key == 27 || key == 'q') {
       break;
     }
