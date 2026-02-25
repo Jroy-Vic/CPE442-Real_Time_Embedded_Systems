@@ -24,7 +24,7 @@ cv::Mat to442_grayscale(const cv::Mat &RGBFrame) {
   const uint8_t kR = 0.2126 * INT_CONV_FACTOR;
   const uint8_t kG = 0.7152 * INT_CONV_FACTOR;
   const uint8_t kB = 0.0722 * INT_CONV_FACTOR;
-  const uint8x8_t kR_vec = vdup_n_u8(kR);
+  const uint8x8_t kR_vec = vdup_n_u8(kR);     // Create vector copy of static variable
   const uint8x8_t kG_vec = vdup_n_u8(kG);
   const uint8x8_t kB_vec = vdup_n_u8(kB);
 
@@ -33,6 +33,7 @@ cv::Mat to442_grayscale(const cv::Mat &RGBFrame) {
     // Create vector pointers for input pixel (3 Unsigned Bytes) and output pixel (1 Unsigned Byte)
     // Note: OpenCV uses uchar instead of uint8_t but are functionally equivalent
     const cv::Vec3b* inPixel = RGBFrame.ptr<cv::Vec3b>(rowIDX);
+    const uint8_t* inPixel_1b = (const uint8_t*) inPixel;   // Separate RGB Frame by Bytes instead of Pixels
     uchar* outPixel = outFrame.ptr<uchar>(rowIDX);
 
     // Iterate every 8 Pixels (columns) in row
@@ -41,7 +42,7 @@ cv::Mat to442_grayscale(const cv::Mat &RGBFrame) {
       // Obtain RGB values by grouping 8 RGB Pixels into {B, G, R} vectors
       // ie) {B0 G0 R0}, {B1 G1 R1}, {B2 G2 R2} ... {B7 G7 R7}
       //     0 Vec3b      1 Vec3b     2 Vec3b         7 Vec3b
-      uint8x8x3_t BGR = vld3_u8(inPixel + colIDX);  // Iterate every 24 bytes
+      uint8x8x3_t BGR = vld3_u8(inPixel_1b + (3 * colIDX));  // Iterate every 24 bytes
       uint8x8_t B = BGR.val[0];
       uint8x8_t G = BGR.val[1];
       uint8x8_t R = BGR.val[2];
@@ -112,9 +113,9 @@ cv::Mat to442_sobel(const cv::Mat &grayFrame) {
     // Iterate through every 8 Pixels (columns) EXCEPT border
     int colIDX;
     for (colIDX = 1; colIDX <= (grayFrame.cols - BORDER_LEN - 8); colIDX += 8) {
-      uint8_t* pixelPtr_prevRow = prev_pixel_row + (colIDX - 1);
-      uint8_t* pixelPtr_currRow = curr_pixel_row + (colIDX - 1);
-      uint8_t* pixelPtr_nextRow = next_pixel_row + (colIDX - 1);
+      const uint8_t* pixelPtr_prevRow = prev_pixel_row + (colIDX - 1);
+      const uint8_t* pixelPtr_currRow = curr_pixel_row + (colIDX - 1);
+      const uint8_t* pixelPtr_nextRow = next_pixel_row + (colIDX - 1);
 
       // Grab 8 Pixels for Left, Middle, and Right Columns Each
       uint8x8_t topLeft_pixels = vld1_u8(pixelPtr_prevRow);
