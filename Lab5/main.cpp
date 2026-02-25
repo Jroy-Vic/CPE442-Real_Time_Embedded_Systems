@@ -232,7 +232,7 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
     pthread_mutex_lock(&monitor.mutex);
     
     // Put Child Thread to sleep and give Parent Thread access until new frame is processed
-    while (!monitor.eof && !(monitor.frame_handler_state[frame_tail] && monitor.parent_ready)) {
+    while (!monitor.eof && !monitor.frame_handler_state[frame_tail] && !monitor.parent_ready) {
       pthread_cond_wait(&monitor.child_thread_cond, &monitor.mutex);      
     }
 

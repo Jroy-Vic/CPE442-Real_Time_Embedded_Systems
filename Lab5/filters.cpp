@@ -61,21 +61,19 @@ cv::Mat to442_grayscale(const cv::Mat &RGBFrame) {
     }
 
     // Account for Remaining Pixels at the end of row (Apply Filter Per Pixel)
-    if (colIDX < RGBFrame.cols) {
-      for (colIDX -= 8; colIDX < RGBFrame.cols; colIDX++) {
-        // Separate Each Byte into B, G, R pixels respectively
-        uint8_t B = inPixel[colIDX][0];
-        uint8_t G = inPixel[colIDX][1];
-        uint8_t R = inPixel[colIDX][2];
+    for (; colIDX < RGBFrame.cols; colIDX++) {
+      // Separate Each Byte into B, G, R pixels respectively
+      uint8_t B = inPixel[colIDX][0];
+      uint8_t G = inPixel[colIDX][1];
+      uint8_t R = inPixel[colIDX][2];
 
-        // Apply ITU-R Conversion (in integer form, Factor by 256)
-        int gray = (kR * (int) R) + (kG * (int) G) + (kB * (int) B);
-        // Divide by 256 and Round UP
-        gray = (gray + 128) >> 8;
+      // Apply ITU-R Conversion (in integer form, Factor by 256)
+      int gray = (kR * (int) R) + (kG * (int) G) + (kB * (int) B);
+      // Divide by 256 and Round UP
+      gray = (gray + 128) >> 8;
 
-        // Store Grayscale Pixel to Output Frame as unsigned byte
-        outPixel[colIDX] = (uchar) gray;
-      }
+      // Store Grayscale Pixel to Output Frame as unsigned byte
+      outPixel[colIDX] = (uchar) gray;
     }
   }
 
@@ -157,55 +155,53 @@ cv::Mat to442_sobel(const cv::Mat &grayFrame) {
 
 
     // Handle remaining pixels individually
-    if (colIDX < grayFrame.cols) {
-      for (colIDX -= 8; colIDX < (grayFrame.cols - 1); colIDX++) {
-        // Calculate Gx Kernel
-        int Gx = 0;
+      for (; colIDX < (grayFrame.cols - 1); colIDX++) {
+      // Calculate Gx Kernel
+      int Gx = 0;
 
-        // First Row of Kernel
-        Gx += -1 * prev_pixel_row[colIDX - 1];
-        //Gx += 0 * prev_pixel_row[colIDX];       // Removed due to redundancy
-        Gx += 1 * prev_pixel_row[colIDX + 1];
+      // First Row of Kernel
+      Gx += -1 * prev_pixel_row[colIDX - 1];
+      //Gx += 0 * prev_pixel_row[colIDX];       // Removed due to redundancy
+      Gx += 1 * prev_pixel_row[colIDX + 1];
   
-        // Second Row of Kernel
-        Gx += -2 * curr_pixel_row[colIDX - 1];
-        //Gx += 0 * curr_pixel_row[colIDX];
-        Gx += 2 * curr_pixel_row[colIDX + 1];
+      // Second Row of Kernel
+      Gx += -2 * curr_pixel_row[colIDX - 1];
+      //Gx += 0 * curr_pixel_row[colIDX];
+      Gx += 2 * curr_pixel_row[colIDX + 1];
 
-        // Third Row of Kernel
-        Gx += -1 * next_pixel_row[colIDX - 1];
-        //Gx += 0 * next_pixel_row[colIDX];
-        Gx += 1 * next_pixel_row[colIDX + 1];
+      // Third Row of Kernel
+      Gx += -1 * next_pixel_row[colIDX - 1];
+      //Gx += 0 * next_pixel_row[colIDX];
+      Gx += 1 * next_pixel_row[colIDX + 1];
 
-        // Calculate Gy Kernel
-        int Gy = 0;
+      // Calculate Gy Kernel
+      int Gy = 0;
 
-        // First Row of Kernel
-        Gy += 1 * prev_pixel_row[colIDX - 1];
-        Gy += 2 * prev_pixel_row[colIDX];
-        Gy += 1 * prev_pixel_row[colIDX + 1];
+      // First Row of Kernel
+      Gy += 1 * prev_pixel_row[colIDX - 1];
+      Gy += 2 * prev_pixel_row[colIDX];
+      Gy += 1 * prev_pixel_row[colIDX + 1];
 
-        // Second Row of Kernel
-        //Gy += 0 * curr_pixel_row[colIDX - 1];
-        //Gy += 0 * curr_pixel_row[colIDX];
-        //Gy += 0 * curr_pixel_row[colIDX + 1];
+      // Second Row of Kernel
+      //Gy += 0 * curr_pixel_row[colIDX - 1];
+      //Gy += 0 * curr_pixel_row[colIDX];
+      //Gy += 0 * curr_pixel_row[colIDX + 1];
 
-        // Third Row of Kernel
-        Gy += -1 * next_pixel_row[colIDX - 1];
-        Gy += -2 * next_pixel_row[colIDX];
-        Gy += -1 * next_pixel_row[colIDX + 1];
+      // Third Row of Kernel
+      Gy += -1 * next_pixel_row[colIDX - 1];
+      Gy += -2 * next_pixel_row[colIDX];
+      Gy += -1 * next_pixel_row[colIDX + 1];
 
       
-        // Calculate Edge Strength, |G|
-        int G = abs(Gx) + abs(Gy);
-        // Restrict to size 1 Unsigned Byte (0 - 255)
-        if (G > 255) {
-          G = 255;
-        } 
+      // Calculate Edge Strength, |G|
+      int G = abs(Gx) + abs(Gy);
+      // Restrict to size 1 Unsigned Byte (0 - 255)
+      if (G > 255) {
+        G = 255;
+      } 
 
-        // Output Edge Strength to Output Pixel
-        outPixel_row[colIDX] = (uchar) G;
-      }
+      // Output Edge Strength to Output Pixel
+      outPixel_row[colIDX] = (uchar) G;
     }
   }
   
