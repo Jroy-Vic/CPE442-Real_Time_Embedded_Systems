@@ -4,7 +4,7 @@
 
 
 CC							= g++
-CFLAGS 					= -g -Wall -Wextra -Werror -mfpu=neon -std=c++11 -O0 -lpthread
+CFLAGS 					= -g -Wall -Wextra -Werror -std=c++11 -O0 -lpthread
 OPENCV_CFLAGS 	= $(shell pkg-config --cflags opencv4)
 OPENCV_LIBS 		= $(shell pkg-config --libs opencv4)
 PTHREAD_LIBS		= -lpthread
