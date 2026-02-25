@@ -8,6 +8,12 @@
 
 #include <iostream>
 
+// MACROS //
+#define INT_CONV_FACTOR 256
+#define INT_CONV_BITS 8
+#define BORDER_LEN 2
+
+
 // Function: Convert OpenCV RGB Mat Image Frame to Grayscale Mat.
 cv::Mat to442_grayscale(const cv::Mat &inFrame);
 

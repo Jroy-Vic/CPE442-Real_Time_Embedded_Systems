@@ -48,6 +48,7 @@ struct monitor_t {
   cv::Rect worker_segs[SEG_CNT];  // Segment Rectangle (with Padding)
 
   // Child Thread Conditions
+  uint8_t parent_ready = 0x1;
   uint8_t eof = 0x0;
 
   // Output Thread Conditions
@@ -174,8 +175,10 @@ void* inputParse_Thread1(void* vid_ptr) {
 
     // Split Frame only if there is space in the pipeline buffer
     while (monitor.frame_handler_state[frame_head] && !monitor.eof) {
+      monitor.parent_ready = 0x0;
       pthread_cond_wait(&monitor.parent_thread_cond, &monitor.mutex);
     }
+    monitor.parent_ready = 0x1;
 
     for (uint8_t i = 0; i < SEG_CNT; i++) {
       // Allocates new memory to each segment and stores globally
@@ -228,7 +231,7 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
     pthread_mutex_lock(&monitor.mutex);
     
     // Put Child Thread to sleep and give Parent Thread access until new frame is processed
-    while (!monitor.eof && !monitor.frame_handler_state[frame_tail]) {
+    while (!monitor.eof && !monitor.frame_handler_state[frame_tail] && !monitor.parent_ready) {
       pthread_cond_wait(&monitor.child_thread_cond, &monitor.mutex);      
     }
 
