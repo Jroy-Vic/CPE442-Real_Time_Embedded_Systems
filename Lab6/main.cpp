@@ -275,7 +275,8 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
     PAPI_register_thread();
 
     eventSet = PAPI_NULL;
-    counters[2] = {PAPI_TOT_CYC, PAPI_L1_DCM};
+    counters[0] = PAPI_TOT_CYC;
+    counters[1] = PAPI_L1_DCM;
     PAPI_create_eventset(&eventSet);
     PAPI_add_events(eventSet, counters, 2);
     PAPI_start(eventSet);
