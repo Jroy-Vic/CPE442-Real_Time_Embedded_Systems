@@ -267,14 +267,15 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
   // Determine which segment to process
   int idx = arg->idx;
 
-  // Isolate Thread2 (Child 0 Only) to Core 1 
+  // Isolate Thread2 (Child 0 Only) to Core 1
+  int eventSet, counters[2];
   if (idx == 0) {
     pin_to_core(1);
 
     PAPI_register_thread();
 
-    int eventSet = PAPI_NULL;
-    int counters[2] = {PAPI_TOT_CYC, PAPI_L1_DCM};
+    eventSet = PAPI_NULL;
+    counters[2] = {PAPI_TOT_CYC, PAPI_L1_DCM};
     PAPI_create_eventset(&eventSet);
     PAPI_add_events(eventSet, counters, 2);
     PAPI_start(eventSet);
@@ -285,7 +286,9 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
   while (1) {
     // Create Pipeline Buffer Iterator and iterate PAPI Counter
     frame_tail = frame_tail % BUFF_SIZE;
-    frameCnt_thread2++;
+    if (idx == 0) {
+      frameCnt_thread2++;
+    }
 
     // Give single Child Thread permission to process
     pthread_mutex_lock(&monitor.mutex);
@@ -367,9 +370,10 @@ void* recombFrame_Thread3(void*) {
   cv::namedWindow("Sobel", cv::WINDOW_AUTOSIZE);
 
   while (1) {
-    // Create Pipeline Buffer Iterator
+    // Create Pipeline Buffer Iterator and iterate PAPI Counter
     static int frame_tail = 0;
     frame_tail = frame_tail % BUFF_SIZE;
+    frameCnt_thread3++;
 
     // Give access to Output Thread
     pthread_mutex_lock(&monitor.mutex);
@@ -595,6 +599,12 @@ int main(int argc, char** argv) {
   std::cout << "// ---------- Thread 1, Core 0 ----------- //\n\n";
   std::cout << "Average Number of Cache Misses per Frame: " << (values_thread1[1] / frameCnt_thread1) << "\n";
   std::cout << "Average Number of Cycles per Frame: " << (values_thread1[0] / frameCnt_thread1) << "\n\n";
+  std::cout << "// --- Thread 2, Core 1 (Child 0 Only) --- //\n\n";
+  std::cout << "Average Number of Cache Misses per Frame: " << (values_thread2[1] / frameCnt_thread2) << "\n";
+  std::cout << "Average Number of Cycles per Frame: " << (values_thread2[0] / frameCnt_thread2) << "\n\n";
+  std::cout << "// ---------- Thread 3, Core 2 ----------- //\n\n";
+  std::cout << "Average Number of Cache Misses per Frame: " << (values_thread3[1] / frameCnt_thread3) << "\n";
+  std::cout << "Average Number of Cycles per Frame: " << (values_thread3[0] / frameCnt_thread3) << "\n\n";
   std::cout << "// --------------------------------------- //\n\n";
   PAPI_cleanup_eventset(eventSet);
   PAPI_destroy_eventset(&eventSet);
