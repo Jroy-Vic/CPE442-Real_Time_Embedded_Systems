@@ -87,9 +87,9 @@ monitor_t monitor;
 uint32_t frameCnt_thread1 = 0;
 uint32_t frameCnt_thread2 = 0;
 uint32_t frameCnt_thread3 = 0;
-long long values_thead1[2] = {0,0};
-long long values_thead2[2] = {0,0};
-long long values_thead3[2] = {0,0};
+long long values_thread1[2] = {0,0};
+long long values_thread2[2] = {0,0};
+long long values_thread3[2] = {0,0};
 
 // ------------------------------------------------------- //
 // Thread Definitions //
@@ -244,7 +244,7 @@ void* inputParse_Thread1(void* vid_ptr) {
   // -------------------------------------------------- //
   
   // Calculate PAPI Characteristics
-  PAPI_stop(eventSet, values_thead1);
+  PAPI_stop(eventSet, values_thread1);
   PAPI_cleanup_eventset(eventSet);
   PAPI_destroy_eventset(&eventSet);
   PAPI_unregister_thread();
@@ -337,7 +337,7 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
 
   // Calculate PAPI Characteristics for Child 0
   if (idx == 0) {
-    PAPI_stop(eventSet, values_thead2);
+    PAPI_stop(eventSet, values_thread2);
     PAPI_cleanup_eventset(eventSet);
     PAPI_destroy_eventset(&eventSet);
     PAPI_unregister_thread();
@@ -474,7 +474,7 @@ void* recombFrame_Thread3(void*) {
 
   
   // Stop PAPI Counter
-  PAPI_stop(eventSet, values_thead3);
+  PAPI_stop(eventSet, values_thread3);
   PAPI_cleanup_eventset(eventSet);
   PAPI_destroy_eventset(&eventSet);
   PAPI_unregister_thread();
