@@ -588,8 +588,6 @@ int main(int argc, char** argv) {
   std::cout << "Average Number of Cache Misses per Frame: " << ((double) values_thread3[1] / (double) frameCnt_thread3) << "\n";
   std::cout << "Average Number of Cycles per Frame: " << ((double) values_thread3[0] / (double) frameCnt_thread3) << "\n\n";
   std::cout << "// --------------------------------------- //\n\n";
-  PAPI_cleanup_eventset(eventSet);
-  PAPI_destroy_eventset(&eventSet);
   PAPI_shutdown();
 
   return 0;
