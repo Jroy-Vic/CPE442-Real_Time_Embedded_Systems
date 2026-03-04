@@ -572,8 +572,9 @@ int main(int argc, char** argv) {
   std::cout << "\n// ---------- PAPI Counter Data ---------- //\n";
   std::cout << "  Description: End-to-End System Operation\n\n";
   std::cout << "Total Time Elapsed (sec): " << timeTotal << "\n";
-  std::cout << "Total Cycles Processed: " << (values_thread1[0] + values_thread2[0] + values_thread3[0]) << "\n";
-  std::cout << "Total L1 Cache Misses: " << (values_thread1[1] + values_thread2[1] + values_thread3[1]) << "\n";
+  std::cout << "Approx. Total Cycles Processed: " << (values_thread1[0] + (values_thread2[0] * 4) + values_thread3[0]) << "\n";
+  std::cout << "Approx. Total L1 Cache Misses: " << (values_thread1[1] + (values_thread2[1] * 4)  + values_thread3[1]) << "\n";
+  std::cout << "Total Average Cycles per Frame: " << ((values_thread1[0] + (values_thread2[0] * 4) + values_thread3[0]) / frameCnt_thread1) << "\n"; 
   std::cout << "Total Average Frames per Second (FPS): " << ((double) frameCnt_thread1 / (double) timeTotal) << "\n\n";
   std::cout << "// ---------- Thread 1, Core 0 ----------- //\n";
   std::cout << "    Description: Input Frame Read + Split\n\n";
