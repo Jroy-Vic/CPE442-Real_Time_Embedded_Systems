@@ -285,12 +285,9 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
 
   int frame_tail = 0;
   while (1) {
-    // Create Pipeline Buffer Iterator and iterate PAPI Counter
+    // Create Pipeline Buffer Iterator
     frame_tail = frame_tail % BUFF_SIZE;
-    if (idx == 0) {
-      frameCnt_thread2++;
-    }
-
+    
     // Give single Child Thread permission to process
     pthread_mutex_lock(&monitor.mutex);
     
@@ -330,8 +327,11 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
         pthread_cond_signal(&monitor.output_thread_cond);
       }
 
-      // Increment pipeline buffer index
+      // Increment pipeline buffer index and PAPI Counter
       frame_tail++;
+      if (idx == 0) {
+        frameCnt_thread2++;
+      }
     }
 
     // Unlock Child Thread; Allow other threads to process
@@ -371,10 +371,9 @@ void* recombFrame_Thread3(void*) {
   cv::namedWindow("Sobel", cv::WINDOW_AUTOSIZE);
 
   while (1) {
-    // Create Pipeline Buffer Iterator and iterate PAPI Counter
+    // Create Pipeline Buffer Iterator
     static int frame_tail = 0;
     frame_tail = frame_tail % BUFF_SIZE;
-    frameCnt_thread3++;
 
     // Give access to Output Thread
     pthread_mutex_lock(&monitor.mutex);
@@ -471,6 +470,9 @@ void* recombFrame_Thread3(void*) {
 
       // Relock all other threads before finishing
       pthread_mutex_lock(&monitor.mutex);
+
+      // Iterate PAPI Counter  
+      frameCnt_thread3++;
     }
 
     // Allow other threads to pass
@@ -541,27 +543,7 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  int eventSet = PAPI_NULL;
-  int counters[2] = {PAPI_TOT_CYC, PAPI_L1_DCM};
-  long long values[2] = {0,0};
-
-  if (PAPI_create_eventset(&eventSet) != PAPI_OK) {
-    std::cerr << "PAPI_create_eventset failed\n";
-
-    return -1;
-  }
-  if (PAPI_add_events(eventSet, counters, 2) != PAPI_OK) {
-    std::cerr << "PAPI_add_events failed\n";
-
-    return -1;
-  } 
-
-  // Start PAPI Counters
-  if (PAPI_start(eventSet) != PAPI_OK) {
-    std::cerr << "PAPI_start failed\n";
-
-    return -1;
-  }
+  // Start Timer
   auto timeStart = std::chrono::steady_clock::now();
 
 
@@ -578,11 +560,6 @@ int main(int argc, char** argv) {
 
   // Stop PAPI Counters
   auto timeEnd = std::chrono::steady_clock::now();
-  if (PAPI_stop(eventSet, values) != PAPI_OK) {
-    std::cerr << "PAPI_stop failed\n";
-
-    return -1;
-  }
 
 
   // Close OpenCV Applications
@@ -592,20 +569,24 @@ int main(int argc, char** argv) {
 
   // Print Counter Data
   double timeTotal = std::chrono::duration<double>(timeEnd - timeStart).count();
-  std::cout << "\n// ---------- PAPI Counter Data ---------- //\n\n"; 
+  std::cout << "\n// ---------- PAPI Counter Data ---------- //\n";
+  std::cout << "  Description: End-to-End System Operation\n\n";
   std::cout << "Total Time Elapsed (sec): " << timeTotal << "\n";
-  std::cout << "Total Cycles Processed: " << values[0] << "\n";
-  std::cout << "Total L1 Cache Misses: " << values[1] << "\n";
-  std::cout << "Total Average Frames per Second (FPS): " << (frameCnt_thread1 / timeTotal) << "\n\n";
-  std::cout << "// ---------- Thread 1, Core 0 ----------- //\n\n";
-  std::cout << "Average Number of Cache Misses per Frame: " << (values_thread1[1] / frameCnt_thread1) << "\n";
-  std::cout << "Average Number of Cycles per Frame: " << (values_thread1[0] / frameCnt_thread1) << "\n\n";
-  std::cout << "// --- Thread 2, Core 1 (Child 0 Only) --- //\n\n";
-  std::cout << "Average Number of Cache Misses per Frame: " << (values_thread2[1] / frameCnt_thread2) << "\n";
-  std::cout << "Average Number of Cycles per Frame: " << (values_thread2[0] / frameCnt_thread2) << "\n\n";
-  std::cout << "// ---------- Thread 3, Core 2 ----------- //\n\n";
-  std::cout << "Average Number of Cache Misses per Frame: " << (values_thread3[1] / frameCnt_thread3) << "\n";
-  std::cout << "Average Number of Cycles per Frame: " << (values_thread3[0] / frameCnt_thread3) << "\n\n";
+  std::cout << "Total Cycles Processed: " << (values_thread1[0] + values_thread2[0] + values_thread3[0]) << "\n";
+  std::cout << "Total L1 Cache Misses: " << (values_thread1[1] + values_thread2[1] + values_thread3[1]) << "\n";
+  std::cout << "Total Average Frames per Second (FPS): " << ((double) frameCnt_thread1 / (double) timeTotal) << "\n\n";
+  std::cout << "// ---------- Thread 1, Core 0 ----------- //\n";
+  std::cout << "    Description: Input Frame Read + Split\n\n";
+  std::cout << "Average Number of Cache Misses per Frame: " << ((double) values_thread1[1] / (double) frameCnt_thread1) << "\n";
+  std::cout << "Average Number of Cycles per Frame: " << ((double) values_thread1[0] / (double) frameCnt_thread1) << "\n\n";
+  std::cout << "// --- Thread 2, Core 1 (Child 0 Only) --- //\n";
+  std::cout << "    Description: Process 1/4 Frame Segment\n\n";
+  std::cout << "Average Number of Cache Misses per Frame: " << ((double) values_thread2[1] / (double) frameCnt_thread2) << "\n";
+  std::cout << "Average Number of Cycles per Frame: " << ((double) values_thread2[0] / (double) frameCnt_thread2) << "\n\n";
+  std::cout << "// ---------- Thread 3, Core 2 ----------- //\n";
+  std::cout << "        Description: Recombine Frame\n\n";
+  std::cout << "Average Number of Cache Misses per Frame: " << ((double) values_thread3[1] / (double) frameCnt_thread3) << "\n";
+  std::cout << "Average Number of Cycles per Frame: " << ((double) values_thread3[0] / (double) frameCnt_thread3) << "\n\n";
   std::cout << "// --------------------------------------- //\n\n";
   PAPI_cleanup_eventset(eventSet);
   PAPI_destroy_eventset(&eventSet);
