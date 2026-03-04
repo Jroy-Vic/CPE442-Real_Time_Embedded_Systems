@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <papi.h>
 #include <chrono>
+#include <sched.h>
 #include "filters.hpp"
 
 // MACROS:
@@ -21,6 +22,18 @@
 void* inputParse_Thread1(void* vid_ptr);
 void* processSegment_Thread2(void* seg_idx_ptr);
 void* recombFrame_Thread3(void*);
+
+// Core Functions:
+// Isolate Function to a single core
+void pin_to_core(int core_id) {
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(core_id, &cpuset);
+  int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+  if (rc != 0) {
+    std::cerr << "Error calling pthread_setaffinity_np: " << rc << "\n";
+  }
+}
 
 
 // ------------------------------------------------------- //
@@ -70,6 +83,13 @@ struct child_arg_t {
 // Create Monitor Variable for Thread1 and Thread2
 monitor_t monitor;
 
+// Create Global Frame Counters
+uint32_t frameCnt_thread1 = 0;
+uint32_t frameCnt_thread2 = 0;
+uint32_t frameCnt_thread3 = 0;
+long long values_thead1[2] = {0,0};
+long long values_thead2[2] = {0,0};
+long long values_thead3[2] = {0,0};
 
 // ------------------------------------------------------- //
 // Thread Definitions //
@@ -78,6 +98,19 @@ monitor_t monitor;
 // splitting each frame into four equal rows before moving on to the next;
 // apply padding pixels when necessary and pass each segment to child threads.
 void* inputParse_Thread1(void* vid_ptr) {
+  // Isolate Thread1 to Core 0 
+  pin_to_core(0);
+  // Compute PAPI Characteristics
+  PAPI_register_thread();
+
+  int eventSet = PAPI_NULL;
+  int counters[2] = {PAPI_TOT_CYC, PAPI_L1_DCM};
+
+  PAPI_create_eventset(&eventSet);
+  PAPI_add_events(eventSet, counters, 2);
+  PAPI_start(eventSet);
+
+
   // Recast vid_ptr (void*) into a VideoCapture object pointer
   cv::VideoCapture* vid = (cv::VideoCapture*) vid_ptr;
 
@@ -128,6 +161,9 @@ void* inputParse_Thread1(void* vid_ptr) {
       pthread_mutex_unlock(&monitor.mutex);
       break;
     }
+
+    // Increment Frame Counter
+    frameCnt_thread1++;
 
     // -------------------------------------------------- //
 
@@ -206,6 +242,12 @@ void* inputParse_Thread1(void* vid_ptr) {
   }
 
   // -------------------------------------------------- //
+  
+  // Calculate PAPI Characteristics
+  PAPI_stop(eventSet, values_thead1);
+  PAPI_cleanup_eventset(eventSet);
+  PAPI_destroy_eventset(&eventSet);
+  PAPI_unregister_thread();
 
   // Once EOF has been reached (or error occurred), join threads together to end process
   for (uint8_t i = 0; i < SEG_CNT; i++) {
@@ -225,10 +267,25 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
   // Determine which segment to process
   int idx = arg->idx;
 
+  // Isolate Thread2 (Child 0 Only) to Core 1 
+  if (idx == 0) {
+    pin_to_core(1);
+
+    PAPI_register_thread();
+
+    int eventSet = PAPI_NULL;
+    int counters[2] = {PAPI_TOT_CYC, PAPI_L1_DCM};
+    PAPI_create_eventset(&eventSet);
+    PAPI_add_events(eventSet, counters, 2);
+    PAPI_start(eventSet);
+  }
+
+
   int frame_tail = 0;
   while (1) {
-    // Create Pipeline Buffer Iterator
+    // Create Pipeline Buffer Iterator and iterate PAPI Counter
     frame_tail = frame_tail % BUFF_SIZE;
+    frameCnt_thread2++;
 
     // Give single Child Thread permission to process
     pthread_mutex_lock(&monitor.mutex);
@@ -277,6 +334,15 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
     pthread_mutex_unlock(&monitor.mutex);
   }
 
+
+  // Calculate PAPI Characteristics for Child 0
+  if (idx == 0) {
+    PAPI_stop(eventSet, values_thead2);
+    PAPI_cleanup_eventset(eventSet);
+    PAPI_destroy_eventset(&eventSet);
+    PAPI_unregister_thread();
+  }
+  
   std::cout << "Child Thread " << idx << " done.\n";
   return nullptr;
 }
@@ -285,6 +351,18 @@ void* processSegment_Thread2(void* seg_idx_ptr) {
 // Thread Function: Wait for all four frame segments to be processed and received,
 // then stitch them all back into a single frame.
 void* recombFrame_Thread3(void*) {
+  // Isolate Thread3 to Core 2 
+  pin_to_core(2);
+  // Start PAPI Counter
+  PAPI_register_thread();
+
+  int eventSet = PAPI_NULL;
+  int counters[2] = {PAPI_TOT_CYC, PAPI_L1_DCM};
+  PAPI_create_eventset(&eventSet);
+  PAPI_add_events(eventSet, counters, 2);
+  PAPI_start(eventSet);
+
+
   // Create a Single Display Window
   cv::namedWindow("Sobel", cv::WINDOW_AUTOSIZE);
 
@@ -394,6 +472,13 @@ void* recombFrame_Thread3(void*) {
     pthread_mutex_unlock(&monitor.mutex); 
   }
 
+  
+  // Stop PAPI Counter
+  PAPI_stop(eventSet, values_thead3);
+  PAPI_cleanup_eventset(eventSet);
+  PAPI_destroy_eventset(&eventSet);
+  PAPI_unregister_thread();
+
   std::cout << "Output Thread done.\n";
   return nullptr;
 }
@@ -442,6 +527,11 @@ int main(int argc, char** argv) {
   // Initialize PAPI
   if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) {
     std::cerr << "PAPI_library_init failed\n";
+
+    return -1;
+  }
+  if (PAPI_thread_init((unsigned long (*)(void)) pthread_self) != PAPI_OK) {
+    std::cerr << "PAPI_thread_init failed\n";
 
     return -1;
   }
@@ -497,10 +587,14 @@ int main(int argc, char** argv) {
 
   // Print Counter Data
   double timeTotal = std::chrono::duration<double>(timeEnd - timeStart).count();
-  std::cout << "\n// ---------- PAPI Counter Data ---------- //\n"; 
+  std::cout << "\n// ---------- PAPI Counter Data ---------- //\n\n"; 
   std::cout << "Total Time Elapsed (sec): " << timeTotal << "\n";
   std::cout << "Total Cycles Processed: " << values[0] << "\n";
   std::cout << "Total L1 Cache Misses: " << values[1] << "\n";
+  std::cout << "Total Average Frames per Second (FPS): " << (frameCnt_thread1 / timeTotal) << "\n\n";
+  std::cout << "// ---------- Thread 1, Core 0 ----------- //\n\n";
+  std::cout << "Average Number of Cache Misses per Frame: " << (values_thread1[1] / frameCnt_thread1) << "\n";
+  std::cout << "Average Number of Cycles per Frame: " << (values_thread1[0] / frameCnt_thread1) << "\n\n";
   std::cout << "// --------------------------------------- //\n\n";
   PAPI_cleanup_eventset(eventSet);
   PAPI_destroy_eventset(&eventSet);
